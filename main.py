@@ -3,15 +3,15 @@ import pandas as pd
 import numpy as np
 from scipy.optimize import linprog
 
-st.set_page_config(page_title="نظام إدارة المخاطر المصرفية الشامل", page_icon="🏦", layout="centered")
+st.set_page_config(page_title="نظام إدارة المخاطر المصرفية", page_icon="🏦", layout="centered")
 
 st.title("🏦 نظام التحسين وإدارة المخاطر الشاملة")
-st.caption("دمج مخاطر الائتمان، السوق، السيولة، والبلد في نماذج البرمجة الخطية وبالأهداف")
+st.caption("جداول مستقلة لمخاطر الائتمان، السوق، السيولة، والبلد مع التحسين الرياضي")
 
-main_tab1, main_tab2 = st.tabs(["📊 1. تحسين المحفظة (4 مخاطر)", "🧮 2. حاسبة المخاطر الشاملة لقرض"])
+main_tab1, main_tab2 = st.tabs(["📊 1. تحسين المحفظة (جداول مستقلة)", "🧮 2. حاسبة المخاطر لقرض فردي"])
 
 # ==============================================================================
-# التبويب الأول: تحسين المحفظة بدمج المخاطر الأربعة
+# التبويب الأول: تحسين المحفظة بجداول مستقلة لكل مخاطرة
 # ==============================================================================
 with main_tab1:
     with st.expander("⚙️ إعدادات السيولة وأوزان الأهداف", expanded=True):
@@ -22,33 +22,54 @@ with main_tab1:
         with col_w2:
             w_risk = st.slider("أهمية تقليل المخاطر الكلية:", 1, 50, 25)
 
-    st.subheader("📋 جدول القروض والمخاطر الأربعة (%)")
-    default_loans = pd.DataFrame([
-        {
-            "الفئة": "قرض استهلاكي", "الفائدة %": 7.5,
-            "ائتمان (PD×LGD)%": 0.75, "سوق %": 0.40, "سيولة %": 0.50, "بلد %": 0.30,
-            "الحد الأدنى": 0.0, "الحد الأقصى": 40.0
-        },
-        {
-            "الفئة": "قرض عقاري", "الفائدة %": 6.5,
-            "ائتمان (PD×LGD)%": 0.25, "سوق %": 0.80, "سيولة %": 1.20, "بلد %": 0.30,
-            "الحد الأدنى": 20.0, "الحد الأقصى": 60.0
-        },
-        {
-            "الفئة": "مؤسسات (SME)", "الفائدة %": 10.0,
-            "ائتمان (PD×LGD)%": 2.70, "سوق %": 0.90, "سيولة %": 0.60, "بلد %": 0.70,
-            "الحد الأدنى": 0.0, "الحد الأقصى": 50.0
-        },
+    st.subheader("📋 إدخال بيانات كل مخاطرة في جدول مستقل")
+    r_tab1, r_tab2, r_tab3, r_tab4 = st.tabs([
+        "1️⃣ مخاطر الائتمان",
+        "2️⃣ مخاطر السوق",
+        "3️⃣ مخاطر السيولة",
+        "4️⃣ مخاطر البلد"
     ])
-    df_loans = st.data_editor(default_loans, num_rows="dynamic", use_container_width=True)
 
-    df_loans["إجمالي المخاطرة %"] = (
-        df_loans["ائتمان (PD×LGD)%"] +
-        df_loans["سوق %"] +
-        df_loans["سيولة %"] +
-        df_loans["بلد %"]
+    # الجدول 1: الأساسي + مخاطر الائتمان
+    with r_tab1:
+        st.caption("أدخل الفائدة، حدود التمويل، ومخاطر الائتمان (PD × LGD) لكل فئة:")
+        df_credit = st.data_editor(pd.DataFrame([
+            {"الفئة": "قرض استهلاكي", "الفائدة %": 7.5, "مخاطر الائتمان %": 0.75, "الحد الأدنى": 0.0, "الحد الأقصى": 40.0},
+            {"الفئة": "قرض عقاري", "الفائدة %": 6.5, "مخاطر الائتمان %": 0.25, "الحد الأدنى": 20.0, "الحد الأقصى": 60.0},
+            {"الفئة": "مؤسسات (SME)", "الفائدة %": 10.0, "مخاطر الائتمان %": 2.70, "الحد الأدنى": 0.0, "الحد الأقصى": 50.0},
+        ]), use_container_width=True, key="t_credit")
+
+    # الجدول 2: مخاطر السوق مستقلة
+    with r_tab2:
+        st.caption("تقلب أسعار الفائدة والتضخم (Risque de marché):")
+        df_market = st.data_editor(pd.DataFrame({
+            "الفئة": df_credit["الفئة"],
+            "مخاطر السوق %": [0.40, 0.80, 0.90]
+        }), disabled=["الفئة"], use_container_width=True, key="t_market")
+
+    # الجدول 3: مخاطر السيولة مستقلة
+    with r_tab3:
+        st.caption("صعوبة تسييل القرض وطول المدة (Risque de liquidité):")
+        df_liquidity = st.data_editor(pd.DataFrame({
+            "الفئة": df_credit["الفئة"],
+            "مخاطر السيولة %": [0.50, 1.20, 0.60]
+        }), disabled=["الفئة"], use_container_width=True, key="t_liquidity")
+
+    # الجدول 4: مخاطر البلد مستقلة
+    with r_tab4:
+        st.caption("المخاطر الاقتصادية والتشريعية (Risque de pays):")
+        df_country = st.data_editor(pd.DataFrame({
+            "الفئة": df_credit["الفئة"],
+            "مخاطر البلد %": [0.30, 0.30, 0.70]
+        }), disabled=["الفئة"], use_container_width=True, key="t_country")
+
+    # دمج المخاطر الأربعة حسابياً لتشغيل النموذج
+    total_risk_pct_series = (
+        df_credit["مخاطر الائتمان %"] +
+        df_market["مخاطر السوق %"] +
+        df_liquidity["مخاطر السيولة %"] +
+        df_country["مخاطر البلد %"]
     )
-    st.dataframe(df_loans[["الفئة", "الفائدة %", "إجمالي المخاطرة %"]], use_container_width=True)
 
     with st.expander("🎯 المستهدفات المالية للمحفظة", expanded=True):
         c1, c2, c3 = st.columns(3)
@@ -60,10 +81,10 @@ with main_tab1:
             target_risk_gp = st.number_input("المخاطر الكلية المستهدفة (م):", value=2.5, step=0.2)
 
     if st.button("🚀 احسب التوزيع الأمثل الشامل", type="primary", use_container_width=True):
-        n = len(df_loans)
-        rates = df_loans["الفائدة %"].values / 100.0
-        total_risks = df_loans["إجمالي المخاطرة %"].values / 100.0
-        bounds_base = [(df_loans["الحد الأدنى"].iloc[i], df_loans["الحد الأقصى"].iloc[i]) for i in range(n)]
+        n = len(df_credit)
+        rates = df_credit["الفائدة %"].values / 100.0
+        total_risks = total_risk_pct_series.values / 100.0
+        bounds_base = [(df_credit["الحد الأدنى"].iloc[i], df_credit["الحد الأقصى"].iloc[i]) for i in range(n)]
 
         # 1. البرمجة الخطية (LP)
         res_lp = linprog(
@@ -95,46 +116,63 @@ with main_tab1:
             alloc_gp = res_gp.x[:n]
 
             st.divider()
-            st.subheader("📈 النتائج بعد دمج المخاطر الأربعة")
+            st.subheader("📈 توزيع السيولة المقترح")
 
-            t1, t2 = st.tabs(["⚖️ البرمجة بالأهداف (المتوازن)", "💰 البرمجة الخطية (أعلى عائد)"])
-            with t1:
+            res_t1, res_t2 = st.tabs(["⚖️ البرمجة بالأهداف (المتوازن)", "💰 البرمجة الخطية (أعلى عائد)"])
+            with res_t1:
                 m1, m2 = st.columns(2)
                 m1.metric("العائد المتوقع", f"{np.sum(alloc_gp * rates):.2f} م")
                 m2.metric("المخاطر الكلية", f"{np.sum(alloc_gp * total_risks):.2f} م")
-                st.bar_chart(pd.DataFrame({"المبلغ (مليون)": alloc_gp}, index=df_loans["الفئة"]))
+                st.bar_chart(pd.DataFrame({"المبلغ (مليون)": alloc_gp}, index=df_credit["الفئة"]))
 
-            with t2:
+            with res_t2:
                 m3, m4 = st.columns(2)
                 m3.metric("العائد الأقصى", f"{np.sum(alloc_lp * rates):.2f} م")
                 m4.metric("المخاطر الكلية", f"{np.sum(alloc_lp * total_risks):.2f} م")
-                st.bar_chart(pd.DataFrame({"المبلغ (مليون)": alloc_lp}, index=df_loans["الفئة"]))
+                st.bar_chart(pd.DataFrame({"المبلغ (مليون)": alloc_lp}, index=df_credit["الفئة"]))
 
-            breakdown_df = pd.DataFrame({
-                "نوع المخاطرة": ["مخاطر الائتمان", "مخاطر السوق", "مخاطر السيولة", "مخاطر البلد"],
-                "بالبرمجة الخطية (م)": [
-                    round(np.sum(alloc_lp * (df_loans["ائتمان (PD×LGD)%"]/100)), 3),
-                    round(np.sum(alloc_lp * (df_loans["سوق %"]/100)), 3),
-                    round(np.sum(alloc_lp * (df_loans["سيولة %"]/100)), 3),
-                    round(np.sum(alloc_lp * (df_loans["بلد %"]/100)), 3),
-                ],
-                "بالبرمجة بالأهداف (م)": [
-                    round(np.sum(alloc_gp * (df_loans["ائتمان (PD×LGD)%"]/100)), 3),
-                    round(np.sum(alloc_gp * (df_loans["سوق %"]/100)), 3),
-                    round(np.sum(alloc_gp * (df_loans["سيولة %"]/100)), 3),
-                    round(np.sum(alloc_gp * (df_loans["بلد %"]/100)), 3),
-                ]
-            })
-            st.write("**تفصيل الخسائر المتوقعة حسب نوع المخاطرة:**")
-            st.dataframe(breakdown_df, use_container_width=True)
+            st.subheader("📑 جداول الخسائر المتوقعة لكل مخاطرة على حدة")
+
+            # 4 جداول مستقلة للنتائج
+            st.markdown("**1️⃣ جدول مخاطر الائتمان (Risque de crédit):**")
+            st.dataframe(pd.DataFrame({
+                "الفئة": df_credit["الفئة"],
+                "النسبة %": df_credit["مخاطر الائتمان %"],
+                "خسارة الخطية (م)": np.round(alloc_lp * (df_credit["مخاطر الائتمان %"]/100), 3),
+                "خسارة الأهداف (م)": np.round(alloc_gp * (df_credit["مخاطر الائتمان %"]/100), 3),
+            }), use_container_width=True)
+
+            st.markdown("**2️⃣ جدول مخاطر السوق (Risque de marché):**")
+            st.dataframe(pd.DataFrame({
+                "الفئة": df_credit["الفئة"],
+                "النسبة %": df_market["مخاطر السوق %"],
+                "خسارة الخطية (م)": np.round(alloc_lp * (df_market["مخاطر السوق %"]/100), 3),
+                "خسارة الأهداف (م)": np.round(alloc_gp * (df_market["مخاطر السوق %"]/100), 3),
+            }), use_container_width=True)
+
+            st.markdown("**3️⃣ جدول مخاطر السيولة (Risque de liquidité):**")
+            st.dataframe(pd.DataFrame({
+                "الفئة": df_credit["الفئة"],
+                "النسبة %": df_liquidity["مخاطر السيولة %"],
+                "خسارة الخطية (م)": np.round(alloc_lp * (df_liquidity["مخاطر السيولة %"]/100), 3),
+                "خسارة الأهداف (م)": np.round(alloc_gp * (df_liquidity["مخاطر السيولة %"]/100), 3),
+            }), use_container_width=True)
+
+            st.markdown("**4️⃣ جدول مخاطر البلد (Risque de pays):**")
+            st.dataframe(pd.DataFrame({
+                "الفئة": df_credit["الفئة"],
+                "النسبة %": df_country["مخاطر البلد %"],
+                "خسارة الخطية (م)": np.round(alloc_lp * (df_country["مخاطر البلد %"]/100), 3),
+                "خسارة الأهداف (م)": np.round(alloc_gp * (df_country["مخاطر البلد %"]/100), 3),
+            }), use_container_width=True)
         else:
             st.error("⚠️ تعذر إيجاد حل! يرجى رفع سقف المخاطر الكلية المسموح به.")
 
 # ==============================================================================
-# التبويب الثاني: حاسبة المخاطر الشاملة لقرض فردي + المؤشر البصري
+# التبويب الثاني: حاسبة المخاطر الفردية (كل مخاطرة بجدولها المستقل + المؤشر البصري)
 # ==============================================================================
 with main_tab2:
-    st.subheader("🔍 تقييم المخاطر الأربعة لقرض محدد")
+    st.subheader("🔍 تقييم قرض محدد")
     
     c_a, c_b = st.columns(2)
     with c_a:
@@ -148,14 +186,13 @@ with main_tab2:
         market_r = st.slider("مخاطر السوق (%):", 0.0, 5.0, 0.4, step=0.1)
         country_r = st.slider("مخاطر البلد (%):", 0.0, 5.0, 0.3, step=0.1)
 
-    # حساب القسط ونسبة الاقتطاع
+    # الحسابات
     months = years * 12
     m_rate = (interest_rate / 100.0) / 12.0
     base_inst = loan_amount * (m_rate * (1 + m_rate)**months) / ((1 + m_rate)**months - 1) if m_rate > 0 else loan_amount / months
     total_inst = base_inst + insurance_tax
     dti = (total_inst / salary) * 100.0
 
-    # تقدير PD ومخاطر السيولة تلقائياً
     pd_est = 1.5 if dti <= 30 else (3.0 if dti <= 36 else (6.0 if dti <= 45 else 10.0))
     liquidity_r = round(years * 0.05, 2)
 
@@ -168,44 +205,9 @@ with main_tab2:
 
     st.divider()
 
-    # ==========================================================================
     # المؤشر البصري التفاعلي (أخضر / أصفر / أحمر)
-    # ==========================================================================
     if dti <= 33.0 and total_risk_pct <= 2.0:
         st.markdown(
             f"""
             <div style="background-color:#d4edda; border-left:8px solid #28a745; padding:15px; border-radius:8px; color:#155724; direction:rtl;">
                 <h3 style="margin:0;">🟢 مؤشر الأمان: منخفض المخاطر (مقبول فوراً)</h3>
-                <p style="margin:5px 0 0 0;">نسبة الاقتطاع ({dti:.1f}%) مثالية، وإجمالي المخاطر ({total_risk_pct:.2f}%) في المنطقة الآمنة تماماً.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    elif dti <= 38.0 and total_risk_pct <= 4.0:
-        st.markdown(
-            f"""
-            <div style="background-color:#fff3cd; border-left:8px solid #ffc107; padding:15px; border-radius:8px; color:#856404; direction:rtl;">
-                <h3 style="margin:0;">🟡 مؤشر الأمان: مخاطر متوسطة (مقبول بضمانات)</h3>
-                <p style="margin:5px 0 0 0;">نسبة الاقتطاع ({dti:.1f}%) تقترب من السقف البنكي، يُنصح بالقبول مع توطين الراتب والتأمين الشامل.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            f"""
-            <div style="background-color:#f8d7da; border-left:8px solid #dc3545; padding:15px; border-radius:8px; color:#721c24; direction:rtl;">
-                <h3 style="margin:0;">🔴 مؤشر الأمان: مخاطر مرتفعة (يُنصح بالرفض أو التعديل)</h3>
-                <p style="margin:5px 0 0 0;">نسبة الاقتطاع ({dti:.1f}%) أو المخاطر الكلية ({total_risk_pct:.2f}%) تتجاوز الحدود الآمنة. يُنصح بتمديد المدة أو تقليل المبلغ.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.write("")
-    r1, r2, r3 = st.columns(3)
-    r1.metric("القسط الشهري", f"{total_inst:.2f} م")
-    r2.metric("نسبة الاقتطاع", f"{dti:.1f}%")
-    r3.metric("إجمالي الخسارة المتوقعة", f"{total_el:.2f} م ({total_risk_pct:.2f}%)")
-
-    st.write(f"**تفصيل المخاطر على قرض {loan_amount} مليون:**")
