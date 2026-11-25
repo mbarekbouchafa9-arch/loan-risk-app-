@@ -160,23 +160,65 @@ with tab2:
 # التبويب الثالث: حاسبة المخاطر المطوّرة
 # ==============================================================================
 with tab3:
-    st.subheader("📐 استخراج نسب المخاطر من المعطيات الأولية")
+    st.subheader("📐 حساب نسبة كل مخاطرة على حدة")
+    st.caption("اختر نوع المخاطرة من القائمة أدناه لحساب نسبتها من معطياتها الأولية:")
     
     risk_choice = st.selectbox(
-        "اختر المخاطرة لحساب معاملها ونسبتها تلقائياً:",
+        "اختر المخاطرة المطلوبة:",
         [
-            "1️⃣ مخاطر الائتمان (من نسبة الضمانات)",
-            "2️⃣ مخاطر السوق (من المدة وتغير الفائدة)",
-            "3️⃣ مخاطر السيولة (من فائدة القرض وإعادة التمويل)",
-            "4️⃣ مخاطر البلد (من عوائد السندات وحساسية القطاع)"
-        ]
+            "1️⃣ مخاطر الائتمان (Risque de crédit)",
+            "2️⃣ مخاطر السوق (Risque de marché)",
+            "3️⃣ مخاطر السيولة (Risque de liquidité)",
+            "4️⃣ مخاطر البلد (Risque de pays)"
+        ],
+        key="t3_choice"
     )
 
     st.divider()
 
-    if risk_choice == "1️⃣ مخاطر الائتمان (من نسبة الضمانات)":
-        st.markdown("### 1️⃣ مخاطر الائتمان (Risque de crédit)")
-        pd_val = st.number_input("احتمالية التعثر PD (%):", min_value=0.0, value=3.0, step=0.5)
+    # 1. مخاطر الائتمان وحدها
+    if risk_choice == "1️⃣ مخاطر الائتمان (Risque de crédit)":
+        st.markdown("### 1️⃣ مخاطر الائتمان (وحدها)")
+        pd_val = st.number_input("احتمالية التعثر PD (%):", min_value=0.0, value=3.0, step=0.5, key="t3_pd")
+        recovery_val = st.slider("نسبة تغطية الضمانات والتأمين (%):", 0, 100, 75, step=5, key="t3_rec")
+        lgd_calc = 100.0 - recovery_val
+        res_credit = (pd_val * lgd_calc) / 100.0
+        st.info(f"نسبة الخسارة عند التعثر المحسوبة (LGD) = **100% - {recovery_val}% = {lgd_calc:.1f}%**")
+        st.success(f"**نسبة مخاطر الائتمان النهائية = {res_credit:.2f}%**")
+
+    # 2. مخاطر السوق وحدها
+    elif risk_choice == "2️⃣ مخاطر السوق (Risque de marché)":
+        st.markdown("### 2️⃣ مخاطر السوق (وحدها)")
+        loan_yrs = st.number_input("مدة القرض الإجمالية (سنوات):", min_value=1, value=10, step=1, key="t3_myrs")
+        dr_val = st.number_input("التغير المتوقع في سعر الفائدة (%):", min_value=0.0, value=0.10, step=0.05, key="t3_dr")
+        duration_calc = round(loan_yrs * 0.40, 2)
+        res_market = duration_calc * dr_val
+        st.info(f"المدة المعدلة المحسوبة (Duration) = **{duration_calc} سنوات**")
+        st.success(f"**نسبة مخاطر السوق النهائية = {res_market:.2f}%**")
+
+    # 3. مخاطر السيولة وحدها
+    elif risk_choice == "3️⃣ مخاطر السيولة (Risque de liquidité)":
+        st.markdown("### 3️⃣ مخاطر السيولة (وحدها)")
+        loan_rate = st.number_input("معدل فائدة قرضك (%):", min_value=0.0, value=7.5, step=0.5, key="t3_lrate")
+        short_rate = st.number_input("تكلفة التمويل قصير الأجل (%):", min_value=0.0, value=3.0, step=0.5, key="t3_srate")
+        yrs_val = st.number_input("مدة القرض (سنوات):", min_value=1, value=10, step=1, key="t3_lyrs")
+        liq_share = st.slider("حصة تغطية السيولة من الفارق (%):", 5, 25, 12, key="t3_lshare")
+        spread = max(0.0, loan_rate - short_rate)
+        res_liq = spread * (liq_share / 100.0)
+        annual_cost_factor = res_liq / yrs_val
+        st.info(f"معامل التكلفة السنوي المستخرج = **{annual_cost_factor:.3f}%** سنوياً")
+        st.success(f"**نسبة مخاطر السيولة الإجمالية ({yrs_val} سنوات) = {res_liq:.2f}%**")
+
+    # 4. مخاطر البلد وحدها
+    elif risk_choice == "4️⃣ مخاطر البلد (Risque de pays)":
+        st.markdown("### 4️⃣ مخاطر البلد (وحدها)")
+        gov_bond = st.number_input("عائد السندات الحكومية للدولة (%):", min_value=0.0, value=6.0, step=0.5, key="t3_gbond")
+        risk_free = st.number_input("العائد الخالي من المخاطر المرجعي (%):", min_value=0.0, value=3.0, step=0.5, key="t3_rfree")
+        sec_val = st.slider("معامل حساسية القطاع (0.1 محلي - 0.5 تجاري):", 0.05, 1.0, 0.10, step=0.05, key="t3_sec")
+        crp_calc = max(0.0, gov_bond - risk_free)
+        res_pays = crp_calc * sec_val
+        st.info(f"علاوة مخاطر الدولة المحسوبة (CRP) = **{crp_calc:.2f}%**")
+        st.success(f"**نسبة مخاطر البلد النهائية = {res_pays:.2f}%**")
 
 with tab4:
     st.subheader("💱 أسعار العملات العالمية مقابل الدينار الجزائري (DZD)")
