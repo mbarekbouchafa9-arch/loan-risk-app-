@@ -6,7 +6,7 @@ from scipy.optimize import linprog
 st.set_page_config(page_title="نظام إدارة المخاطر المصرفية", page_icon="🏦", layout="centered")
 
 st.title("🏦 نظام التحسين وإدارة المخاطر الشاملة")
-st.caption("منصة متكاملة لتحسين المحافظ، تقييم القروض، وحساب نسب المخاطر المستقلة")
+st.caption("منصة متكاملة لتحسين المحافظ، تقييم القروض، وحساب نسب المخاطر من مدخلاتها الأولية")
 
 # ==============================================================================
 # التبويبات الثلاثة الرئيسية في أعلى واجهة التطبيق
@@ -14,7 +14,7 @@ st.caption("منصة متكاملة لتحسين المحافظ، تقييم ا�
 tab1, tab2, tab3 = st.tabs([
     "📊 1. تحسين المحفظة",
     "🧮 2. تقييم قرض فردي",
-    "📐 3. حاسبة المخاطر المستقلة"
+    "📐 3. حاسبة المخاطر المطوّرة"
 ])
 
 # ==============================================================================
@@ -30,7 +30,7 @@ with tab1:
         w_risk = st.slider("أهمية تقليل المخاطر الكلية:", 1, 50, 25)
 
     df_loans = st.data_editor(pd.DataFrame([
-        {"الفئة": "قرض استهلاكي", "الفائدة %": 7.5, "ائتمان %": 0.75, "سوق %": 0.40, "سيولة %": 0.50, "بلد %": 0.30, "الحد الأدنى": 0.0, "الحد الأقصى": 40.0},
+        {"الفئة": "قرض استهلاكي", "الفائدة %": 7.5, "ائتمان %": 0.75, "سوق %": 0.40, "سيولة %": 0.54, "بلد %": 0.30, "الحد الأدنى": 0.0, "الحد الأقصى": 40.0},
         {"الفئة": "قرض عقاري", "الفائدة %": 6.5, "ائتمان %": 0.25, "سوق %": 0.80, "سيولة %": 1.20, "بلد %": 0.30, "الحد الأدنى": 20.0, "الحد الأقصى": 60.0},
         {"الفئة": "مؤسسات (SME)", "الفائدة %": 10.0, "ائتمان %": 2.70, "سوق %": 0.90, "سيولة %": 0.60, "بلد %": 0.70, "الحد الأدنى": 0.0, "الحد الأقصى": 50.0},
     ]), use_container_width=True)
@@ -88,7 +88,7 @@ with tab2:
     dti = (total_inst / salary) * 100.0
 
     pd_est = 1.5 if dti <= 30 else (3.0 if dti <= 36 else (6.0 if dti <= 45 else 10.0))
-    liquidity_r = round(years * 0.05, 2)
+    liquidity_r = round(years * 0.054, 2)
     total_el = loan_amount * (((pd_est * lgd_ind)/100.0 + market_r + liquidity_r + country_r) / 100.0)
     total_risk_pct = (total_el / loan_amount) * 100.0
 
@@ -107,51 +107,65 @@ with tab2:
     r3.metric("إجمالي الخسارة", f"{total_el:.2f} م")
 
 # ==============================================================================
-# التبويب الثالث: حاسبة نسبة كل مخاطرة وحدها بشكل مستقل تماماً
+# التبويب الثالث: حاسبة المخاطر المطوّرة (استخراج المعاملات من المدخلات الأولية)
 # ==============================================================================
 with tab3:
-    st.subheader("📐 حساب نسبة كل مخاطرة على حدة")
+    st.subheader("📐 استخراج نسب المخاطر من المعطيات الأولية")
     
     risk_choice = st.selectbox(
-        "اختر نوع المخاطرة التي تريد حساب نسبتها الآن:",
+        "اختر المخاطرة لحساب معاملها ونسبتها تلقائياً:",
         [
-            "1️⃣ مخاطر الائتمان (Risque de crédit)",
-            "2️⃣ مخاطر السوق (Risque de marché)",
-            "3️⃣ مخاطر السيولة (Risque de liquidité)",
-            "4️⃣ مخاطر البلد (Risque de pays)"
+            "1️⃣ مخاطر الائتمان (من نسبة الضمانات)",
+            "2️⃣ مخاطر السوق (من المدة وتغير الفائدة)",
+            "3️⃣ مخاطر السيولة (من فائدة القرض وإعادة التمويل)",
+            "4️⃣ مخاطر البلد (من عوائد السندات وحساسية القطاع)"
         ]
     )
 
     st.divider()
 
-    # 1. مخاطر الائتمان وحدها
-    if risk_choice == "1️⃣ مخاطر الائتمان (Risque de crédit)":
-        st.markdown("### 1️⃣ مخاطر الائتمان (وحدها)")
-        pd_val = st.number_input("احتمالية التعثر PD (%):", min_value=0.0, value=3.0, step=0.5, key="ind_pd")
-        lgd_val = st.number_input("نسبة الخسارة عند التعثر LGD (%):", min_value=0.0, max_value=100.0, value=25.0, step=5.0, key="ind_lgd")
-        res_credit = (pd_val * lgd_val) / 100.0
-        st.success(f"**نسبة مخاطر الائتمان = {res_credit:.2f}%**")
+    # 1. مخاطر الائتمان المطورة
+    if risk_choice == "1️⃣ مخاطر الائتمان (من نسبة الضمانات)":
+        st.markdown("### 1️⃣ مخاطر الائتمان (Risque de crédit)")
+        pd_val = st.number_input("احتمالية التعثر PD (%):", min_value=0.0, value=3.0, step=0.5)
+        recovery_val = st.slider("نسبة تغطية الضمانات والتأمين (%):", 0, 100, 75, step=5)
+        
+        lgd_calc = 100.0 - recovery_val
+        res_credit = (pd_val * lgd_calc) / 100.0
+        
+        st.info(f"نسبة الخسارة عند التعثر المحسوبة (LGD) = **100% - {recovery_val}% = {lgd_calc:.1f}%**")
+        st.success(f"**نسبة مخاطر الائتمان النهائية = {res_credit:.2f}%**")
 
-    # 2. مخاطر السوق وحدها
-    elif risk_choice == "2️⃣ مخاطر السوق (Risque de marché)":
-        st.markdown("### 2️⃣ مخاطر السوق (وحدها)")
-        dur_val = st.number_input("المدة المعدلة للقرض (سنوات):", min_value=0.1, value=4.0, step=0.5, key="ind_dur")
-        dr_val = st.number_input("التغير المتوقع في الفائدة (%):", min_value=0.0, value=0.10, step=0.05, key="ind_dr")
-        res_market = dur_val * dr_val
-        st.success(f"**نسبة مخاطر السوق = {res_market:.2f}%**")
+    # 2. مخاطر السوق المطورة
+    elif risk_choice == "2️⃣ مخاطر السوق (من المدة وتغير الفائدة)":
+        st.markdown("### 2️⃣ مخاطر السوق (Risque de marché)")
+        loan_yrs = st.number_input("مدة القرض الإجمالية (سنوات):", min_value=1, value=10, step=1)
+        dr_val = st.number_input("التغير المتوقع في سعر الفائدة (%):", min_value=0.0, value=0.10, step=0.05)
+        
+        # حساب المدة المعدلة تقريبياً للقروض ذات الأقساط الثابتة (40% من المدة)
+        duration_calc = round(loan_yrs * 0.40, 2)
+        res_market = duration_calc * dr_val
+        
+        st.info(f"المدة المعدلة المحسوبة (Duration) = **{duration_calc} سنوات**")
+        st.success(f"**نسبة مخاطر السوق النهائية = {res_market:.2f}%**")
 
-    # 3. مخاطر السيولة وحدها
-    elif risk_choice == "3️⃣ مخاطر السيولة (Risque de liquidité)":
-        st.markdown("### 3️⃣ مخاطر السيولة (وحدها)")
-        yrs_val = st.number_input("مدة القرض (سنوات):", min_value=1, value=10, step=1, key="ind_yrs")
-        liq_val = st.number_input("معامل تكلفة السيولة السنوي (%):", min_value=0.0, value=0.05, step=0.01, key="ind_liq")
-        res_liq = yrs_val * liq_val
-        st.success(f"**نسبة مخاطر السيولة = {res_liq:.2f}%**")
+    # 3. مخاطر السيولة المطورة (المعادلة التي طورتها لقرضك)
+    elif risk_choice == "3️⃣ مخاطر السيولة (من فائدة القرض وإعادة التمويل)":
+        st.markdown("### 3️⃣ مخاطر السيولة (Risque de liquidité)")
+        loan_rate = st.number_input("معدل فائدة قرضك (%):", min_value=0.0, value=7.5, step=0.5)
+        short_rate = st.number_input("تكلفة التمويل قصير الأجل / إعادة التمويل (%):", min_value=0.0, value=3.0, step=0.5)
+        yrs_val = st.number_input("مدة القرض (سنوات):", min_value=1, value=10, step=1)
+        liq_share = st.slider("حصة تغطية السيولة من الفارق (%):", 5, 25, 12)
+        
+        spread = max(0.0, loan_rate - short_rate)
+        res_liq = spread * (liq_share / 100.0)
+        annual_cost_factor = res_liq / yrs_val
+        
+        st.info(f"معامل التكلفة السنوي المستخرج = **{annual_cost_factor:.3f}%** سنوياً")
+        st.success(f"**نسبة مخاطر السيولة الإجمالية ({yrs_val} سنوات) = {res_liq:.2f}%**")
 
-    # 4. مخاطر البلد وحدها
-    elif risk_choice == "4️⃣ مخاطر البلد (Risque de pays)":
-        st.markdown("### 4️⃣ مخاطر البلد (وحدها)")
-        crp_val = st.number_input("علاوة مخاطر الدولة CRP (%):", min_value=0.0, value=3.0, step=0.5, key="ind_crp")
-        sec_val = st.number_input("معامل حساسية القطاع (0.1 - 1.0):", min_value=0.05, max_value=1.0, value=0.10, step=0.05, key="ind_sec")
-        res_pays = crp_val * sec_val
-        st.success(f"**نسبة مخاطر البلد = {res_pays:.2f}%**")
+    # 4. مخاطر البلد المطورة
+    elif risk_choice == "4️⃣ مخاطر البلد (من عوائد السندات وحساسية القطاع)":
+        st.markdown("### 4️⃣ مخاطر البلد (Risque de pays)")
+        gov_bond = st.number_input("عائد السندات الحكومية للدولة (%):", min_value=0.0, value=6.0, step=0.5)
+        risk_free = st.number_input("العائد الخالي من المخاطر المرجعي (%):", min_value=0.0, value=3.0, step=0.5)
