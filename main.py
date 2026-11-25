@@ -177,3 +177,106 @@ with tab3:
     if risk_choice == "1️⃣ مخاطر الائتمان (من نسبة الضمانات)":
         st.markdown("### 1️⃣ مخاطر الائتمان (Risque de crédit)")
         pd_val = st.number_input("احتمالية التعثر PD (%):", min_value=0.0, value=3.0, step=0.5)
+
+with tab4:
+    st.subheader("💱 أسعار العملات العالمية مقابل الدينار الجزائري (DZD)")
+    st.caption("متابعة أسعار الشراء والبيع وتغيرات الصرف مقابل الدينار الجزائري")
+
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        market_mode = st.radio("نوع التسعيرة:", ["🏦 السعر الرسمي (البنك)", "💵 السوق الموازية (مخصص)"], key="fx_mode")
+    with col_m2:
+        spread_pct = st.slider("هامش البيع والشراء (%):", 0.1, 3.0, 0.5, step=0.1, key="fx_spread")
+
+    if market_mode == "🏦 السعر الرسمي (البنك)":
+        base_dict = {
+            "EUR (اليورو)": 150.31,
+            "USD (الدولار الأمريكي)": 137.01,
+            "GBP (الجنيه الإسترليني)": 179.53,
+            "CAD (الدولار الكندي)": 95.65,
+            "CHF (الفرنك السويسري)": 163.71,
+            "SAR (الريال السعودي)": 36.51,
+        }
+        prev_dict = {
+            "EUR (اليورو)": 151.48,
+            "USD (الدولار الأمريكي)": 135.79,
+            "GBP (الجنيه الإسترليني)": 178.20,
+            "CAD (الدولار الكندي)": 96.10,
+            "CHF (الفرنك السويسري)": 162.50,
+            "SAR (الريال السعودي)": 36.20,
+        }
+    else:
+        base_dict = {
+            "EUR (اليورو)": 275.00,
+            "USD (الدولار الأمريكي)": 245.00,
+            "GBP (الجنيه الإسترليني)": 318.00,
+            "CAD (الدولار الكندي)": 172.00,
+            "CHF (الفرنك السويسري)": 285.00,
+            "SAR (الريال السعودي)": 65.50,
+        }
+        prev_dict = {
+            "EUR (اليورو)": 272.00,
+            "USD (الدولار الأمريكي)": 241.00,
+            "GBP (الجنيه الإسترليني)": 315.00,
+            "CAD (الدولار الكندي)": 170.00,
+            "CHF (الفرنك السويسري)": 282.00,
+            "SAR (الريال السعودي)": 64.50,
+        }
+
+    if st.button("🔄 جلب أحدث أسعار الصرف من الإنترنت", use_container_width=True):
+        try:
+            import requests
+            r = requests.get("https://er-api.com", timeout=3).json()
+            if r.get("result") == "success" and market_mode == "🏦 السعر الرسمي (البنك)":
+                rates_api = r["rates"]
+                base_dict["EUR (اليورو)"] = round(1.0 / rates_api["EUR"], 2)
+                base_dict["USD (الدولار الأمريكي)"] = round(1.0 / rates_api["USD"], 2)
+                base_dict["GBP (الجنيه الإسترليني)"] = round(1.0 / rates_api["GBP"], 2)
+                base_dict["CAD (الدولار الكندي)"] = round(1.0 / rates_api["CAD"], 2)
+                base_dict["CHF (الفرنك السويسري)"] = round(1.0 / rates_api["CHF"], 2)
+                base_dict["SAR (الريال السعودي)"] = round(1.0 / rates_api["SAR"], 2)
+                st.success("تم تحديث الأسعار بنجاح!")
+        except Exception:
+            st.warning("تم استخدام الأسعار المرجعية المخزنة.")
+
+    rows = []
+    half_spread = (spread_pct / 100.0) / 2.0
+    for curr, mid_price in base_dict.items():
+        buy_price = round(mid_price * (1 - half_spread), 2)
+        sell_price = round(mid_price * (1 + half_spread), 2)
+        prev_p = prev_dict.get(curr, mid_price)
+        change_pct = round(((mid_price - prev_p) / prev_p) * 100.0, 2)
+        trend_icon = f"🟢 +{change_pct}%" if change_pct > 0 else (f"🔴 {change_pct}%" if change_pct < 0 else "⚪ 0.0%")
+        rows.append({
+            "العملة": curr,
+            "سعر الشراء (DZD)": buy_price,
+            "سعر البيع (DZD)": sell_price,
+            "التغير": trend_icon
+        })
+
+    df_fx = pd.DataFrame(rows)
+    st.dataframe(df_fx, use_container_width=True)
+
+    st.divider()
+    st.subheader("🔄 محول العملات الفوري (بيع / شراء)")
+    
+    selected_curr = st.selectbox("اختر العملة:", list(base_dict.keys()), key="fx_curr")
+    col_op1, col_op2 = st.columns(2)
+    with col_op1:
+        op_type = st.selectbox("نوع العملية:", ["شراء عملة (تدفع DZD)", "بيع عملة (تستلم DZD)"], key="fx_op")
+    with col_op2:
+        fx_amount = st.number_input("المبلغ بالعملة:", min_value=1.0, value=100.0, step=10.0, key="fx_amt")
+
+    mid_selected = base_dict[selected_curr]
+    buy_selected = round(mid_selected * (1 - half_spread), 2)
+    sell_selected = round(mid_selected * (1 + half_spread), 2)
+
+    if "شراء عملة" in op_type:
+        total_dzd = fx_amount * sell_selected
+        st.info(f"لشراء **{fx_amount:,.2f} {selected_curr}** بسعر البيع (**{sell_selected} دج**)، ستدفع: **{total_dzd:,.2f} دينار جزائري**.")
+    else:
+        total_dzd = fx_amount * buy_selected
+        st.success(f"عند بيع **{fx_amount:,.2f} {selected_curr}** بسعر الشراء (**{buy_selected} دج**)، ستستلم: **{total_dzd:,.2f} دينار جزائري**.")
+
+    st.subheader("📈 مقارنة أسعار البيع والشراء (DZD)")
+    st.bar_chart(df_fx.set_index("العملة")[["سعر الشراء (DZD)", "سعر البيع (DZD)"]])
