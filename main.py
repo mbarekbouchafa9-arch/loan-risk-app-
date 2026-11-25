@@ -2,9 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.optimize import linprog
-
 st.set_page_config(page_title="نظام إدارة المخاطر المصرفية", page_icon="🏦", layout="centered")
-
 st.title("🏦 نظام التحسين وإدارة المخاطر الشاملة")
 st.caption("جداول مستقلة لمخاطر الائتمان، السوق، السيولة، والبلد مع التحسين الرياضي")
 
@@ -205,7 +203,7 @@ with main_tab2:
 
     st.divider()
 
-    # المؤشر البصري التفاعلي (أخضر / أصفر / أحمر)
+# المؤشر البصري التفاعلي (أخضر / أصفر / أحمر)
     if dti <= 33.0 and total_risk_pct <= 2.0:
         st.markdown(
             f"""
